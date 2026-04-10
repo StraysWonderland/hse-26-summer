@@ -5,7 +5,7 @@ Also this repository will hold example code.
 
 ## Distributed Systems - 19.03.26
 
-General introduction into 
+General introduction into
 - what a distributed system is
 - advantages and disadvantages
 - how it relates to cloud computing
@@ -19,6 +19,7 @@ General introduction into
 ## Cloud Native Development - 27.03.26
 
 Introduction into the developers perspective of the cloud world
+
 - Pillars of Cloud Native Development
 - Microservices
 - Staging
@@ -28,3 +29,8 @@ Introduction into the developers perspective of the cloud world
 - 12 Factor Apps
 
 <img width="1823" height="736" alt="image" src="https://github.com/user-attachments/assets/6466ae7d-31cb-4993-a5ab-b2b771044906" />
+
+## Cloud Native Development in Practice - 10.04.26
+
+### Questions for Exam Preparation
+- With the basic Rest Controller having a local Arraylist as storage of TodoItems: what are potential issues in the long run, where does this conflict with concepts we learned about?
