@@ -166,3 +166,19 @@ public interface TodoRepository extends JpaRepository<TodoItem, Integer> {
 - Why should a database usually be external to application instances in a cloud native or distributed system?
 - What is the difference between using H2 for local development or tests and using a production database such as PostgreSQL?
 - Why is it useful to keep tests on an in-memory database instead of the application's file-based local database?
+
+## Containers Extended and Persistence for Containers - 15.05.26
+
+In this session we extended the persistance capabilites of the TODO application by moving from a local H2 database to a PostgreSQL database running in a separate container. The application and the database were connected through environment variables provided through application configration and the Docker run command.
+
+### Running PostgreSQL as a container
+
+PostgreSQL can be started as a separate container:
+
+```bash
+docker run --name some-postgres -p 5432:5432 -e POSTGRES_PASSWORD=mysecretpassword -e POSTGRES_USER=postgres -e POSTGRES_DB=postgres -d postgres:14.19
+```
+
+The command above starts PostgreSQL and publishes port `5432` to the host. This is useful when the application runs directly on the host or when we want to connect with a local database client.
+
+This is closer to a real distributed application because the application process and the database process run separately and communicate over the network.
