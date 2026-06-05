@@ -424,9 +424,13 @@ Introduction into resilience in cloud native applications, Spring Boot applicati
 - How can Spring Boot Actuator help with operating a service in containers?
 - Why does an application still need resilience logic if containers can be restarted automatically?
 - What could happen if all requests wait forever for a slow downstream service?
+
 ## Kubernetes
 
 Introduction into Kubernetes as an orchestration platform for containerized applications:
+
+<img width="1712" height="1723" alt="image" src="https://github.com/user-attachments/assets/ffe2d7b9-dda1-40a2-b741-135ab8942a8a" />
+
 
 - Kubernetes
   - platform for running and managing containers across a cluster of machines
