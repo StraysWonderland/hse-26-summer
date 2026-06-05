@@ -182,3 +182,245 @@ docker run --name some-postgres -p 5432:5432 -e POSTGRES_PASSWORD=mysecretpasswo
 The command above starts PostgreSQL and publishes port `5432` to the host. This is useful when the application runs directly on the host or when we want to connect with a local database client.
 
 This is closer to a real distributed application because the application process and the database process run separately and communicate over the network.
+
+### Containerising the Spring Boot application
+
+The Spring Boot application in `starterapp/` was packaged as a container image. The repository contains two Dockerfiles to show the difference between a minimal teaching example and a more production-oriented build.
+
+- `starterapp/Dockerfile`
+  - minimal example
+  - expects the `.jar` file to be built before the Docker image is built
+  - copies only the prebuilt jar into a Java runtime image
+  - easy to understand, but the build still depends on the host machine having Maven and the correct Java version
+- `starterapp/Dockerfile.multistage`
+  - best-practice example
+  - builds the jar inside a builder stage
+  - copies only the final jar into a smaller runtime stage
+  - avoids shipping Maven, source code and build output in the final image
+  - runs the application as a non-root user
+
+Build the simple image from a prebuilt jar:
+
+```bash
+cd starterapp
+./mvnw package
+docker build -t starterapp:simple .
+```
+
+Build the multistage image:
+
+```bash
+cd starterapp
+docker build -f Dockerfile.multistage -t starterapp:multistage .
+```
+
+Run the application image and connect it to PostgreSQL running on the host:
+
+```bash
+docker run --rm -p 8080:8080 \
+  -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/postgres \
+  -e SPRING_DATASOURCE_USERNAME=postgres \
+  -e SPRING_DATASOURCE_PASSWORD=mysecretpassword \
+  starterapp:simple
+```
+
+Important idea: `localhost` inside a container means "inside this same container". It does not mean the host machine and it does not mean another container.
+
+For a more realistic setup, the database should use a volume so data survives when the container is removed:
+
+```bash
+docker volume create postgres-data
+
+docker run --name some-postgres \
+  -p 5432:5432 \
+  -e POSTGRES_PASSWORD=mysecretpassword \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_DB=postgres \
+  -v postgres-data:/var/lib/postgresql/data \
+  -d postgres:14.19
+```
+
+### Volumes
+
+Containers are designed to be disposable. If important data is written only into the container filesystem, that data can disappear when the container is removed and recreated.
+
+A Docker volume stores data outside the lifecycle of one specific container.
+
+- named volumes are managed by Docker
+- bind mounts map a specific host directory into a container
+- database containers usually use volumes for persistent data
+- removing a container does not automatically remove its named volumes
+- removing a volume deletes the persisted data stored in that volume
+
+Useful volume commands:
+
+```bash
+docker volume ls
+docker volume inspect postgres-data
+docker volume rm postgres-data
+```
+
+### Networks
+
+Containers have isolated network environments. A container has its own `localhost`, its own filesystem and its own process view.
+
+Docker can connect containers through container networks. On a user-defined Docker network, containers can reach each other by container name.
+
+Example with an explicit network:
+
+```bash
+docker network create todo-net
+
+docker run --name postgres \
+  --network todo-net \
+  -e POSTGRES_PASSWORD=mysecretpassword \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_DB=postgres \
+  -v postgres-data:/var/lib/postgresql/data \
+  -d postgres:14.19
+
+docker run --rm --name starterapp \
+  --network todo-net \
+  -p 8080:8080 \
+  -e SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/postgres \
+  -e SPRING_DATASOURCE_USERNAME=postgres \
+  -e SPRING_DATASOURCE_PASSWORD=mysecretpassword \
+  starterapp:simple
+```
+
+In this example, the application uses `postgres` as the database hostname because `postgres` is the container name on the shared Docker network.
+
+Important networking distinction:
+
+- `localhost` from the host means the host machine
+- `localhost` from the Spring Boot container means the Spring Boot container itself
+- `postgres` from the Spring Boot container means the PostgreSQL container, if both containers are on the same user-defined network
+
+### Docker Compose
+
+Docker Compose describes a multi-container setup in one YAML file. Instead of manually creating networks, volumes and containers with several `docker run` commands, Compose lets us define the desired application stack declaratively.
+
+Compose is useful for local development and teaching because it shows the complete system in one place:
+
+- services define the containers
+- ports define host-to-container port mappings
+- environment variables provide runtime configuration
+- volumes persist data outside containers
+- networks allow services to communicate
+
+Example `compose.yaml`:
+
+```yaml
+services:
+  postgres:
+    image: postgres:14.19
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mysecretpassword
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: ./starterapp
+      dockerfile: Dockerfile.multistage
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/postgres
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: mysecretpassword
+    depends_on:
+      - postgres
+
+volumes:
+  postgres-data:
+```
+
+Start the full stack:
+
+```bash
+docker compose up --build
+```
+
+Stop and remove the containers:
+
+```bash
+docker compose down
+```
+
+Stop and remove the containers plus the database volume:
+
+```bash
+docker compose down -v
+```
+
+`depends_on` controls startup order, but it does not guarantee that PostgreSQL is fully ready to accept connections. Real systems should handle startup timing with retries, health checks or application-level resilience.
+
+### Questions for Exam Preparation
+
+- Why does `localhost` mean different things on the host and inside a container?
+- Why should a database container use a volume?
+- What is the difference between a named volume and a bind mount?
+- What problem does a Docker network solve when multiple containers need to communicate?
+- Why can the application use `postgres` as a hostname in a Compose setup?
+- What is the benefit of Docker Compose compared to several manual `docker run` commands?
+- What is the difference between the simple Dockerfile and the multistage Dockerfile?
+- Why is it better if the final runtime image does not contain Maven, source files or build artifacts?
+- Why should application configuration such as database URLs and passwords be passed through environment variables?
+
+## Resilience
+
+Introduction into resilience in cloud native applications, Spring Boot applications and container-based deployments:
+
+- Resilience
+  - ability of a system to keep working, recover, or degrade gracefully when something fails
+  - important because distributed systems depend on networks, databases, external services and infrastructure
+  - failures are expected events, not exceptional surprises
+- Typical failure scenarios
+  - service instance crashes or is restarted
+  - database is temporarily unavailable
+  - network request is slow, lost or returns an error
+  - container is removed and recreated
+  - one downstream service is overloaded
+- Cloud native resilience
+  - applications should be horizontally scalable
+  - instances should be disposable and replaceable
+  - configuration should come from the environment
+  - persistent state should be stored outside application containers
+  - services should tolerate restarts and temporary dependency failures
+- Resilience patterns
+  - timeouts prevent clients from waiting forever
+  - retries can handle temporary failures, but should be limited
+  - circuit breakers stop repeated calls to a failing dependency
+  - bulkheads isolate failures so one problem does not consume all resources
+  - fallbacks can return reduced functionality when a dependency is unavailable
+- Spring Boot perspective
+  - health endpoints can expose whether an application is alive and ready
+  - Actuator provides operational endpoints such as health and metrics
+  - datasource configuration and profiles should be externalized
+  - startup should handle dependencies that may not be ready immediately
+  - application logic should not assume that every remote call succeeds
+- Containers and resilience
+  - containers can be stopped, replaced and recreated
+  - data inside the container filesystem is not a reliable persistence strategy
+  - container images should be reproducible and environment-independent
+  - orchestration platforms can restart failed containers, but the application must still handle failures correctly
+- Important distinction
+  - high availability means the service should remain reachable
+  - fault tolerance means parts of the system can fail without breaking the whole system
+  - resilience includes detection, recovery and graceful degradation
+
+### Questions for Exam Preparation
+
+- Why is failure considered normal in distributed and cloud native systems?
+- What is the difference between availability, fault tolerance and resilience?
+- Why should application instances be stateless where possible?
+- Why can a retry help with temporary failures, and why can uncontrolled retries make a system worse?
+- What problem does a timeout solve when calling another service?
+- What is the purpose of a circuit breaker?
+- Why should persistent data not be stored only inside an application container?
+- How can Spring Boot Actuator help with operating a service in containers?
+- Why does an application still need resilience logic if containers can be restarted automatically?
+- What could happen if all requests wait forever for a slow downstream service?

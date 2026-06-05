@@ -1,0 +1,55 @@
+# ==============================================================================
+# DEMO: BROKEN ON PURPOSE
+# ------------------------------------------------------------------------------
+# Two Postgres instances bind-mount the SAME named volume `todo_data`.
+# The Todo app from the lecture connects via the `db` hostname.
+# Spoiler: db2 will refuse to start, OR (if db1 is stopped first) both will
+# eventually collide on PGDATA and corrupt it.
+# ==============================================================================
+
+services:
+
+  app:
+    # Adjust if your image name differs. Common options:
+    #   build: ../starterapp           # builds from the lecture repo
+    #   image: starterapp:latest       # uses an already-built image
+    build: ./starterapp
+    container_name: todo_app
+    depends_on:
+      - db1
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db1:5432/todos
+      SPRING_DATASOURCE_USERNAME: todo
+      SPRING_DATASOURCE_PASSWORD: todo
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    ports:
+      - "8080:8080"
+    networks: [demo]
+
+  db1:
+    image: postgres:16
+    container_name: todo_db1
+    environment:
+      POSTGRES_USER: todo
+      POSTGRES_PASSWORD: todo
+      POSTGRES_DB: todos
+    volumes:
+      - todo_data:/var/lib/postgresql/data   # <-- shared
+    networks: [demo]
+
+  db2:
+    image: postgres:16
+    container_name: todo_db2
+    environment:
+      POSTGRES_USER: todo
+      POSTGRES_PASSWORD: todo
+      POSTGRES_DB: todos
+    volumes:
+      - todo_data:/var/lib/postgresql/data   # <-- same volume, on purpose
+    networks: [demo]
+
+volumes:
+  todo_data:
+
+networks:
+  demo:
