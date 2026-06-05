@@ -424,3 +424,101 @@ Introduction into resilience in cloud native applications, Spring Boot applicati
 - How can Spring Boot Actuator help with operating a service in containers?
 - Why does an application still need resilience logic if containers can be restarted automatically?
 - What could happen if all requests wait forever for a slow downstream service?
+## Kubernetes
+
+Introduction into Kubernetes as an orchestration platform for containerized applications:
+
+- Kubernetes
+  - platform for running and managing containers across a cluster of machines
+  - automates deployment, scaling, scheduling and recovery
+  - works with declarative configuration and desired state
+  - is commonly used for cloud native applications
+- Cluster architecture
+  - a cluster consists of control plane components and worker nodes
+  - the control plane stores cluster state and makes scheduling decisions
+  - worker nodes run application workloads
+  - the kubelet on each node communicates with the control plane and manages containers on that node
+  - the container runtime starts and stops containers
+- Desired state
+  - users describe what should exist in YAML manifests or through the API
+  - Kubernetes continuously compares desired state with actual state
+  - controllers reconcile differences by creating, updating or deleting resources
+  - example: if a Pod crashes, Kubernetes can create a replacement to return to the desired number of replicas
+- Kubernetes API objects
+  - Pod is the smallest deployable unit and usually contains one application container
+  - Deployment manages replicated Pods and rolling updates
+  - ReplicaSet keeps a desired number of Pod replicas running
+  - Service provides a stable network endpoint for a set of Pods
+  - Namespace separates resources inside a cluster
+  - PersistentVolume and PersistentVolumeClaim connect workloads to persistent storage
+- Labels and selectors
+  - labels are key-value metadata attached to objects
+  - selectors are used to find matching objects
+  - Services use selectors to route traffic to matching Pods
+  - Deployments use labels to manage the Pods they own
+- Scheduling and self-healing
+  - Kubernetes decides which node should run a Pod
+  - failed Pods can be replaced
+  - rolling updates can gradually replace old versions with new ones
+  - scaling changes the desired number of replicas
+- Networking and configuration
+  - Pods get their own cluster-internal IP addresses
+  - Services provide stable names and load balancing inside the cluster
+  - configuration should be injected through ConfigMaps, Secrets and environment variables
+  - persistent state should use external databases or Kubernetes storage abstractions
+- Connection to previous topics
+  - containers package the application
+  - resilience patterns help the application survive failures
+  - Kubernetes manages container lifecycle, scheduling, networking and desired state
+  - Kubernetes does not remove the need for good application design
+
+Basic Deployment and Service example:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: starterapp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: starterapp
+  template:
+    metadata:
+      labels:
+        app: starterapp
+    spec:
+      containers:
+        - name: starterapp
+          image: starterapp:multistage
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: starterapp
+spec:
+  selector:
+    app: starterapp
+  ports:
+    - port: 8080
+      targetPort: 8080
+```
+
+### Questions for Exam Preparation
+
+- What problem does Kubernetes solve compared to running containers manually with `docker run`?
+- What is the difference between a control plane and a worker node?
+- What does desired state mean in Kubernetes?
+- What is reconciliation, and why is it important?
+- Why is it not recommended to run multiple application containers in the same Pod?
+- What is a Pod, and why is it usually not managed directly in production?
+- What is the purpose of a Deployment?
+- What is the relationship between a Deployment, ReplicaSet and Pod?
+- Why does a Service provide a more stable network endpoint than a Pod IP?
+- What are labels and selectors used for?
+- Why does Kubernetes restarting a failed container not automatically solve all application-level resilience problems?
+- How do containers, Spring Boot resilience and Kubernetes fit together in a cloud native application?
+
